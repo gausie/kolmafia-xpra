@@ -3,16 +3,47 @@
 # xpra-attach-authelia. macOS names a running app after the bundle it runs from, so this is
 # what makes the dock, menu bar and app switcher say KoLmafia instead of Xpra.
 #
-# usage: make-macos-app wss://kolmafia.example.com/xpra/ [destination.app]
+# usage: make-macos-app wss://kolmafia.example.com/xpra/ [xpra attach args...]
+#
+# Extra args are baked into the launcher, e.g. --desktop-scaling=0.5 to pair with a server
+# running KOLMAFIA_UI_SCALE=2. Xpra is downloaded from xpra.org for XPRA_CHANNEL (stable or
+# beta, to match the server) unless XPRA_APP points at an existing Xpra.app. The app is
+# written to KOLMAFIA_APP, ~/Applications/KoLmafia.app by default.
 set -eu
 
-[ $# -ge 1 ] || { echo "usage: $0 wss://host/xpra/ [destination.app]" >&2; exit 2; }
-url=$1
-dest=${2:-$HOME/Applications/KoLmafia.app}
-src=${XPRA_APP:-/Applications/Xpra.app}
+[ $# -ge 1 ] || { echo "usage: $0 wss://host/xpra/ [xpra attach args...]" >&2; exit 2; }
+dest=${KOLMAFIA_APP:-$HOME/Applications/KoLmafia.app}
 here=$(cd "$(dirname "$0")" && pwd)
 
-[ -d "$src" ] || { echo "Xpra.app not found at $src (set XPRA_APP)" >&2; exit 1; }
+# Single-quote each arg for the generated launcher.
+args=""
+for arg in "$@"; do
+  args="$args '$(printf '%s' "$arg" | sed "s/'/'\\\\''/g")'"
+done
+
+if pgrep -f "$dest/Contents/" >/dev/null 2>&1; then
+  echo "$dest is running; quit it first" >&2
+  exit 1
+fi
+
+tmp=$(mktemp -d)
+mnt=""
+cleanup() {
+  [ -z "$mnt" ] || hdiutil detach -quiet "$mnt" || true
+  rm -rf "$tmp"
+}
+trap cleanup EXIT
+
+if [ -n "${XPRA_APP:-}" ]; then
+  src=$XPRA_APP
+else
+  channel=${XPRA_CHANNEL:-stable}
+  echo "Downloading Xpra ($channel, $(uname -m)) from xpra.org"
+  curl -fL --progress-bar -o "$tmp/Xpra.dmg" "https://xpra.org/$channel/MacOS/$(uname -m)/Xpra.dmg"
+  mnt=$(hdiutil attach -nobrowse -readonly "$tmp/Xpra.dmg" 2>/dev/null | tail -1 | cut -f3)
+  src="$mnt/Xpra.app"
+fi
+[ -d "$src" ] || { echo "Xpra.app not found at $src" >&2; exit 1; }
 
 rm -rf "$dest"
 mkdir -p "$(dirname "$dest")"
@@ -23,21 +54,22 @@ res="$dest/Contents/Resources/kolmafia-xpra"
 mkdir -p "$res"
 cp "$here/xpra-attach-authelia" "$here/kolmafia.png" "$here/kolmafia-macos.png" "$res/"
 
-iconset=$(mktemp -d)/kolmafia.iconset
+iconset="$tmp/kolmafia.iconset"
 mkdir -p "$iconset"
 for size in 16 32 128 256 512; do
   sips -z $size $size "$here/kolmafia-macos.png" --out "$iconset/icon_${size}x${size}.png" >/dev/null
   sips -z $((size * 2)) $((size * 2)) "$here/kolmafia-macos.png" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
 done
 iconutil -c icns "$iconset" -o "$dest/Contents/Resources/kolmafia.icns"
-rm -rf "$(dirname "$iconset")"
 
 cat > "$dest/Contents/MacOS/KoLmafia" <<EOF
 #!/bin/sh
 # Finder starts apps with a minimal PATH; the attach script needs curl and jq.
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+# From Xpra.app's LSEnvironment, which can't stay in Info.plist (see below).
+export CRYPTOGRAPHY_OPENSSL_NO_LEGACY=1
 here=\$(cd "\$(dirname "\$0")/.." && pwd)
-XPRA="\$here/MacOS/Xpra" exec "\$here/Resources/kolmafia-xpra/xpra-attach-authelia" '$url'
+XPRA="\$here/MacOS/Xpra" exec "\$here/Resources/kolmafia-xpra/xpra-attach-authelia"$args
 EOF
 chmod +x "$dest/Contents/MacOS/KoLmafia"
 
@@ -48,6 +80,13 @@ done
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier local.kolmafia-xpra" "$plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable KoLmafia" "$plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile kolmafia.icns" "$plist"
+# The launcher is a shell script, and with it an architecture preference leaves LaunchServices
+# unable to pick a binary ("does not have permission to open (null)"), while LSEnvironment makes
+# launchd fail to spawn it at all. The URL and document types would compete with the real
+# Xpra.app for xpra:// links and .xpra files.
+for key in LSArchitecturePriority LSEnvironment CFBundleURLTypes CFBundleDocumentTypes; do
+  /usr/libexec/PlistBuddy -c "Delete :$key" "$plist" 2>/dev/null || true
+done
 
 # Editing the bundle breaks Xpra's ad-hoc signature, so re-sign it ad-hoc.
 codesign --force --deep --sign - "$dest" 2>/dev/null
