@@ -22,7 +22,7 @@ The KoLmafia version is chosen from inside the session: the "KoLmafia version" b
 
 ## Options
 
-- `XPRA_CHANNEL=beta` builds against the xpra beta repo (amd64 only)
+- `XPRA_CHANNEL=beta` uses the xpra beta repo, both when building and for the published image tag (amd64 only)
 - `KOLMAFIA_UI_SCALE=2` renders KoLmafia at 2x; pair with `--desktop-scaling=0.5` on a HiDPI native client
 
 ## Native client behind Authelia

@@ -1,6 +1,6 @@
 services:
   kolmafia:
-    image: ghcr.io/gausie/kolmafia-xpra:latest
+    image: ghcr.io/gausie/kolmafia-xpra:${XPRA_CHANNEL:-stable}
     build:
       context: .
       args:
