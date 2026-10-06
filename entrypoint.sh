@@ -7,6 +7,10 @@ if [ "$(id -u)" = 0 ]; then
   mkdir -p /home/kolmafia/.kolmafia/settings
   chown kolmafia:kolmafia /home/kolmafia /home/kolmafia/.kolmafia /home/kolmafia/.kolmafia/settings /home/kolmafia/jars
   chown -R kolmafia:kolmafia /run/user/1000
+  case ${KOLMAFIA_UI_SCALE:-1} in
+    *[!0-9.]* | .* | *.*.*) echo "KOLMAFIA_UI_SCALE must be a number" >&2; exit 1 ;;
+  esac
+  sed -i "s/^const KOLMAFIA_UI_SCALE = .*/const KOLMAFIA_UI_SCALE = ${KOLMAFIA_UI_SCALE:-1};/" /usr/share/xpra/www/kolmafia.js
   exec setpriv --reuid=kolmafia --regid=kolmafia --init-groups "$0" "$@"
 fi
 

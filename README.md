@@ -23,7 +23,7 @@ The KoLmafia version is chosen from inside the session: the "KoLmafia version" b
 ## Options
 
 - `XPRA_CHANNEL=beta` uses the xpra beta repo, both when building and for the published image tag (amd64 only)
-- `KOLMAFIA_UI_SCALE=2` renders KoLmafia at 2x; pair with `--desktop-scaling=0.5` on a HiDPI native client
+- `KOLMAFIA_UI_SCALE=2` renders KoLmafia and its dialogs at 2x for sharp text on HiDPI screens. The HTML5 client scales it back down by itself; native clients need `--desktop-scaling=0.5`
 - `KOLMAFIA_PUBLIC_URL=https://kolmafia.example.com` is where the relay browser opens when KoLmafia asks for it. Without it the HTML5 client opens it on whatever address you reached xpra on, but the native client can't
 
 ## Native client behind Authelia

@@ -12,6 +12,13 @@ dismissed="$XDG_RUNTIME_DIR/kolmafia.dismissed"
 
 mkdir -p "$jars"
 
+# zenity is GTK, which only scales by whole numbers. Set here rather than in the entrypoint so
+# the xpra server itself isn't scaled.
+case ${KOLMAFIA_UI_SCALE:-1} in
+  *[!0-9]* | 0 | 1) ;;
+  *) export GDK_SCALE=$KOLMAFIA_UI_SCALE ;;
+esac
+
 latest_release() {
   curl -fsSI "$repo/releases/latest" | tr -d '\r' | sed -n 's|^location: .*/tag/r\([0-9]*\)$|\1|ip'
 }
