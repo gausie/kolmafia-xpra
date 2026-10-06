@@ -34,3 +34,5 @@ contrib/xpra-attach-authelia wss://kol.example.com/xpra/
 ```
 
 It finds the Authelia portal from the redirect it gets for that URL (set `AUTHELIA_URL` to override), asks for your login in a dialog, and with "Remember me" keeps it in the macOS keychain or Secret Service. Saved logins that stop working are forgotten and you're asked again. On macOS it uses `/Applications/Xpra.app` when `xpra` isn't on your `PATH`. Needs `curl` and `jq`.
+
+`contrib/make-macos-app wss://kol.example.com/xpra/` builds `~/Applications/KoLmafia.app`, a renamed copy of Xpra.app that runs the above, so it shows up as KoLmafia in Spotlight, the dock and the app switcher.
