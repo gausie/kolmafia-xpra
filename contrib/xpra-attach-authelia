@@ -16,6 +16,10 @@ http_url=$(printf '%s' "$url" | sed 's|^ws://|http://|; s|^wss://|https://|')
 service=xpra-attach-authelia
 icon="$(cd "$(dirname "$0")" && pwd)/kolmafia.png"
 
+# xpra's default title suffix is the server's hostname, which for a container is a random ID.
+# Name the host we actually connected to instead.
+set -- --title="@title@ on $(printf '%s' "$url" | sed -E 's#^[a-z]+://([^/:]+).*#\1#')" "$@"
+
 # Xpra.app's bundled Python has no CA store, so wss:// fails certificate verification without the
 # CA option. On macOS the tray icon is the dock and app switcher icon (--dock-icon is ignored).
 if [ "$(uname)" = Darwin ]; then
