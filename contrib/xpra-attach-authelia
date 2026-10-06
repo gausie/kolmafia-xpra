@@ -20,6 +20,11 @@ icon="$(cd "$(dirname "$0")" && pwd)/kolmafia.png"
 # Name the host we actually connected to instead.
 set -- --title="@title@ on $(printf '%s' "$url" | sed -E 's#^[a-z]+://([^/:]+).*#\1#')" "$@"
 
+# KoLmafia is mostly static text, which lossy and video encodings visibly blur. Automatic
+# scaling is the worst of it: with --desktop-scaling the server sends updates at the reduced
+# size, so text only looks sharp until the next repaint.
+set -- --quality=100 --video=no --video-scaling=off "$@"
+
 # Xpra.app's bundled Python has no CA store, so wss:// fails certificate verification without the
 # CA option. On macOS the tray icon is the dock and app switcher icon (--dock-icon is ignored).
 if [ "$(uname)" = Darwin ]; then
