@@ -11,6 +11,8 @@
 		reverse_proxy 127.0.0.1:14500
 	}
 	handle {
+		# The relay's own / isn't the game.
+		rewrite / /game.php
 		reverse_proxy 127.0.0.1:60080
 	}
 

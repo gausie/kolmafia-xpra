@@ -5,7 +5,7 @@ if [ "$(id -u)" = 0 ]; then
   groupmod -o -g "${PGID:-1000}" kolmafia
   usermod -o -u "${PUID:-1000}" kolmafia
   mkdir -p /home/kolmafia/.kolmafia/settings
-  chown kolmafia:kolmafia /home/kolmafia /home/kolmafia/.kolmafia /home/kolmafia/.kolmafia/settings
+  chown kolmafia:kolmafia /home/kolmafia /home/kolmafia/.kolmafia /home/kolmafia/.kolmafia/settings /home/kolmafia/jars
   chown -R kolmafia:kolmafia /run/user/1000
   exec setpriv --reuid=kolmafia --regid=kolmafia --init-groups "$0" "$@"
 fi

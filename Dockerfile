@@ -18,7 +18,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --uid 1000 kolmafia \
- && mkdir -p /home/kolmafia/.kolmafia /run/user/1000/xpra \
+ && mkdir -p /home/kolmafia/.kolmafia /home/kolmafia/jars /run/user/1000/xpra \
  && mkdir -m 1777 -p /tmp/.X11-unix \
  && chown -R kolmafia:kolmafia /home/kolmafia /run/user/1000
 
@@ -35,7 +35,7 @@ RUN sed -i 's|</head>|<link rel="stylesheet" href="kolmafia.css" /><script src="
 WORKDIR /home/kolmafia
 ENV XDG_RUNTIME_DIR=/run/user/1000
 
-VOLUME /home/kolmafia/.kolmafia
+VOLUME /home/kolmafia/.kolmafia /home/kolmafia/jars
 
 EXPOSE 8080 14500
 

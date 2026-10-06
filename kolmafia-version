@@ -3,7 +3,8 @@ set -u
 
 repo=https://github.com/kolmafia/kolmafia
 api=https://api.github.com/repos/kolmafia/kolmafia
-jars="$HOME/.kolmafia/jars"
+# Kept out of .kolmafia so a synced data directory doesn't carry every downloaded jar.
+jars="$HOME/jars"
 state="$jars/version"
 running="$XDG_RUNTIME_DIR/kolmafia.running"
 pidfile="$XDG_RUNTIME_DIR/kolmafia.pid"

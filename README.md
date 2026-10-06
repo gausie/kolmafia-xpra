@@ -14,7 +14,7 @@ Or skip the build and pull `ghcr.io/gausie/kolmafia-xpra:latest` (amd64 and arm6
 
 Both bind to `BIND_ADDRESS` (default `127.0.0.1`). Put `8080` behind your reverse proxy and auth on a single hostname. Native clients can also go through it with `xpra attach wss://kol.example.com/xpra/`.
 
-The settings directory is bind-mounted from `KOLMAFIA_SETTINGS_DIR`. Everything else (jars, scripts, relay, images) lives in the `kolmafia` volume. Set `PUID`/`PGID` to the owner of the settings directory.
+KoLmafia's data directory (settings, scripts, relay, images) is bind-mounted from `KOLMAFIA_DIR`, so an existing one can be used as-is. Downloaded KoLmafia jars go in the separate `jars` volume. Set `PUID`/`PGID` to the owner of the data directory.
 
 ## Versions
 
