@@ -21,7 +21,8 @@ for arg in "$@"; do
   args="$args '$(printf '%s' "$arg" | sed "s/'/'\\\\''/g")'"
 done
 
-if pgrep -f "$dest/Contents/" >/dev/null 2>&1; then
+# Anchored so it only matches processes started from the bundle, not commands that mention it.
+if pgrep -f "^$dest/Contents/" >/dev/null 2>&1; then
   echo "$dest is running; quit it first" >&2
   exit 1
 fi
