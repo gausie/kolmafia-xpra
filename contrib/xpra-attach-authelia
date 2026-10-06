@@ -66,6 +66,15 @@ ObjC.import('Cocoa');
 function run(argv) {
   const app = $.NSApplication.sharedApplication;
   app.setActivationPolicy(1);
+  // Without an Edit menu, Cmd+V/C/X/A have nothing to dispatch to, so paste doesn't work.
+  const edit = $.NSMenu.alloc.initWithTitle('Edit');
+  [['Undo', 'undo:', 'z'], ['Cut', 'cut:', 'x'], ['Copy', 'copy:', 'c'], ['Paste', 'paste:', 'v'], ['Select All', 'selectAll:', 'a']]
+    .forEach(([title, action, key]) => edit.addItemWithTitleActionKeyEquivalent(title, action, key));
+  const editItem = $.NSMenuItem.alloc.init;
+  editItem.submenu = edit;
+  const menu = $.NSMenu.alloc.init;
+  menu.addItem(editItem);
+  app.mainMenu = menu;
   const alert = $.NSAlert.alloc.init;
   const icon = $.NSImage.alloc.initWithContentsOfFile(argv[2]);
   if (!icon.isNil()) alert.icon = icon;
@@ -76,20 +85,49 @@ function run(argv) {
   const view = $.NSView.alloc.initWithFrame($.NSMakeRect(0, 0, 260, 84));
   const user = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 60, 260, 24));
   user.placeholderString = 'Username';
+  // Revealing swaps in a plain field over the secure one, keeping the text in sync.
   const pass = $.NSSecureTextField.alloc.initWithFrame($.NSMakeRect(0, 30, 260, 24));
   pass.placeholderString = 'Password';
-  const remember = $.NSButton.alloc.initWithFrame($.NSMakeRect(0, 0, 260, 22));
+  const plain = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 30, 260, 24));
+  plain.placeholderString = 'Password';
+  plain.hidden = true;
+  const remember = $.NSButton.alloc.initWithFrame($.NSMakeRect(0, 0, 130, 22));
   remember.setButtonType(3);
   remember.title = 'Remember me';
+  const reveal = $.NSButton.alloc.initWithFrame($.NSMakeRect(130, 0, 130, 22));
+  reveal.setButtonType(3);
+  reveal.title = 'Show password';
+  ObjC.registerSubclass({
+    name: 'RevealToggle',
+    methods: {
+      'toggle:': {
+        types: ['void', ['id']],
+        implementation: () => {
+          const show = reveal.state == 1;
+          const [from, to] = show ? [pass, plain] : [plain, pass];
+          to.stringValue = from.stringValue;
+          from.hidden = true;
+          to.hidden = false;
+          alert.window.makeFirstResponder(to);
+        },
+      },
+    },
+  });
+  const toggle = $.RevealToggle.alloc.init;
+  reveal.target = toggle;
+  reveal.action = 'toggle:';
   view.addSubview(user);
   view.addSubview(pass);
+  view.addSubview(plain);
   view.addSubview(remember);
+  view.addSubview(reveal);
   alert.accessoryView = view;
   alert.layout;
   alert.window.initialFirstResponder = user;
   app.activateIgnoringOtherApps(true);
   if (alert.runModal != 1000) throw new Error('cancelled');
-  return [user.stringValue.js, pass.stringValue.js, remember.state == 1 ? '1' : '0'].join('\n');
+  const password = reveal.state == 1 ? plain.stringValue.js : pass.stringValue.js;
+  return [user.stringValue.js, password, remember.state == 1 ? '1' : '0'].join('\n');
 }
 JS
   elif command -v zenity >/dev/null 2>&1 && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
