@@ -1,0 +1,146 @@
+#!/bin/sh
+# Log in to Authelia and attach the native xpra client with the resulting session cookie,
+# since the client can't follow Authelia's login redirect itself.
+#
+# usage: xpra-attach-authelia wss://kol.example.com/xpra/ [xpra args...]
+#
+# The Authelia portal is found from the redirect it sends for the xpra URL (override with
+# AUTHELIA_URL). Credentials are asked for in a dialog and, with "Remember me", kept in the
+# macOS keychain or the Secret Service (secret-tool) on Linux.
+set -eu
+
+[ $# -ge 1 ] || { echo "usage: $0 wss://host/xpra/ [xpra args...]" >&2; exit 2; }
+url=$1
+shift
+http_url=$(printf '%s' "$url" | sed 's|^ws://|http://|; s|^wss://|https://|')
+service=xpra-attach-authelia
+icon="$(cd "$(dirname "$0")" && pwd)/kolmafia.png"
+
+if [ -n "${AUTHELIA_URL:-}" ]; then
+  auth=${AUTHELIA_URL%/}
+else
+  location=$(curl -sS -o /dev/null -H 'Accept: text/html' -w '%{redirect_url}' "$http_url")
+  auth=$(printf '%s' "$location" | sed -n 's|^\(https\{0,1\}://[^/?]*\).*|\1|p')
+  if [ -z "$auth" ]; then
+    echo "$http_url didn't redirect to Authelia; attaching without logging in" >&2
+    exec "${XPRA:-xpra}" attach "$url" "$@"
+  fi
+fi
+host=${auth#*://}
+
+# Stored as "user:password"; basic auth rules out ":" in usernames anyway.
+load() {
+  if [ "$(uname)" = Darwin ]; then
+    security find-generic-password -s "$service" -a "$host" -w 2>/dev/null
+  elif command -v secret-tool >/dev/null 2>&1; then
+    secret-tool lookup service "$service" host "$host" 2>/dev/null
+  else
+    return 1
+  fi
+}
+
+save() {
+  if [ "$(uname)" = Darwin ]; then
+    # Hex via `security -i` so the password never appears in process arguments.
+    printf 'add-generic-password -U -s "%s" -a "%s" -X %s\n' "$service" "$host" \
+      "$(printf '%s' "$1" | xxd -p | tr -d '\n')" | security -i >/dev/null
+  elif command -v secret-tool >/dev/null 2>&1; then
+    printf '%s' "$1" | secret-tool store --label="Authelia ($host)" service "$service" host "$host"
+  fi
+}
+
+forget() {
+  if [ "$(uname)" = Darwin ]; then
+    security delete-generic-password -s "$service" -a "$host" >/dev/null 2>&1 || true
+  elif command -v secret-tool >/dev/null 2>&1; then
+    secret-tool clear service "$service" host "$host" 2>/dev/null || true
+  fi
+}
+
+# Prints user, password and remember (1/0) on separate lines; fails on cancel.
+prompt() {
+  error=$1
+  if [ "$(uname)" = Darwin ]; then
+    osascript -l JavaScript - "$host" "$error" "$icon" <<'JS'
+ObjC.import('Cocoa');
+function run(argv) {
+  const app = $.NSApplication.sharedApplication;
+  app.setActivationPolicy(1);
+  const alert = $.NSAlert.alloc.init;
+  const icon = $.NSImage.alloc.initWithContentsOfFile(argv[2]);
+  if (!icon.isNil()) alert.icon = icon;
+  alert.messageText = 'Log in to ' + argv[0];
+  alert.informativeText = argv[1] || 'xpra needs your Authelia login to connect.';
+  alert.addButtonWithTitle('Log in');
+  alert.addButtonWithTitle('Cancel');
+  const view = $.NSView.alloc.initWithFrame($.NSMakeRect(0, 0, 260, 84));
+  const user = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 60, 260, 24));
+  user.placeholderString = 'Username';
+  const pass = $.NSSecureTextField.alloc.initWithFrame($.NSMakeRect(0, 30, 260, 24));
+  pass.placeholderString = 'Password';
+  const remember = $.NSButton.alloc.initWithFrame($.NSMakeRect(0, 0, 260, 22));
+  remember.setButtonType(3);
+  remember.title = 'Remember me';
+  view.addSubview(user);
+  view.addSubview(pass);
+  view.addSubview(remember);
+  alert.accessoryView = view;
+  alert.layout;
+  alert.window.initialFirstResponder = user;
+  app.activateIgnoringOtherApps(true);
+  if (alert.runModal != 1000) throw new Error('cancelled');
+  return [user.stringValue.js, pass.stringValue.js, remember.state == 1 ? '1' : '0'].join('\n');
+}
+JS
+  elif command -v zenity >/dev/null 2>&1 && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
+    sep=$(printf '\037')
+    zenity --forms --title="Log in to $host" --window-icon="$icon" --text="${error:-xpra needs your Authelia login to connect.}" \
+      --add-entry=Username --add-password=Password --add-combo="Remember me" --combo-values="No|Yes" \
+      --separator="$sep" | tr "$sep" '\n' | sed '3s/^Yes$/1/; 3s/^No$/0/; 3s/^$/0/'
+  else
+    [ -z "$error" ] || echo "$error" >&2
+    printf 'Authelia username for %s: ' "$host" >&2
+    read -r u
+    printf 'Password: ' >&2
+    stty -echo
+    read -r p || true
+    stty echo
+    printf '\nRemember me? [y/N] ' >&2
+    read -r r
+    case $r in [Yy]*) r=1 ;; *) r=0 ;; esac
+    printf '%s\n%s\n%s\n' "$u" "$p" "$r"
+  fi
+}
+
+# Prints the session cookie on success.
+login() {
+  jq -n --arg u "$1" --arg p "$2" '{username: $u, password: $p, keepMeLoggedIn: false}' \
+    | curl -sS -o /dev/null -D - -H 'Content-Type: application/json' --data @- "$auth/api/firstfactor" \
+    | tr -d '\r' \
+    | awk 'NR == 1 && $2 != 200 { exit 1 } tolower($1) == "set-cookie:" { sub(/;.*/, "", $2); print $2; exit }'
+}
+
+cookie=""
+error=""
+if stored=$(load) && [ -n "$stored" ]; then
+  cookie=$(login "${stored%%:*}" "${stored#*:}") || true
+  if [ -z "$cookie" ]; then
+    forget
+    error="Your saved login was rejected."
+  fi
+fi
+
+while [ -z "$cookie" ]; do
+  answer=$(prompt "$error") || exit 1
+  user=$(printf '%s\n' "$answer" | sed -n 1p)
+  pass=$(printf '%s\n' "$answer" | sed -n 2p)
+  remember=$(printf '%s\n' "$answer" | sed -n 3p)
+  if cookie=$(login "$user" "$pass") && [ -n "$cookie" ]; then
+    [ "$remember" = 1 ] && save "$user:$pass"
+  else
+    cookie=""
+    error="Wrong username or password."
+  fi
+done
+
+XPRA_WEBSOCKET_HEADERS_MODULES=default,env_cookie XPRA_WS_COOKIE="$cookie" exec "${XPRA:-xpra}" attach "$url" "$@"
