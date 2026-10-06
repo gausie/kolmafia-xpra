@@ -20,6 +20,8 @@ else
   echo 'relayAllowRemoteAccess=true' >> "$prefs"
 fi
 
+caddy run --config /etc/caddy/Caddyfile --adapter caddyfile &
+
 exec xpra start :100 \
   --daemon=no \
   --xvfb=Xorg \

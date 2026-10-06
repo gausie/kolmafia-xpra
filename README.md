@@ -9,10 +9,10 @@ docker compose up -d --build
 
 Or skip the build and pull `ghcr.io/gausie/kolmafia-xpra:latest` (amd64 and arm64, rebuilt on every push to `main`). In Portainer, create a stack from `compose.yaml` with the `build:` block removed, and set the variables from `.env.example` in the stack's environment.
 
-- `14500`: xpra (HTML5 client at `/`, native clients via `xpra attach tcp://host:14500` or `wss://`)
-- `60080`: KoLmafia relay browser, once you're logged in
+- `8080`: everything on one port. The KoLmafia relay is at `/` and the xpra HTML5 client at `/xpra/`.
+- `14500`: xpra directly, for native clients on a trusted network (`xpra attach tcp://host:14500`).
 
-Both bind to `BIND_ADDRESS` (default `127.0.0.1`). Put them behind your reverse proxy and auth; the relay needs its own hostname because it serves from `/`.
+Both bind to `BIND_ADDRESS` (default `127.0.0.1`). Put `8080` behind your reverse proxy and auth on a single hostname. Native clients can also go through it with `xpra attach wss://kol.example.com/xpra/`.
 
 The settings directory is bind-mounted from `KOLMAFIA_SETTINGS_DIR`. Everything else (jars, scripts, relay, images) lives in the `kolmafia` volume. Set `PUID`/`PGID` to the owner of the settings directory.
 
@@ -24,3 +24,13 @@ The KoLmafia version is chosen from inside the session: the "KoLmafia version" b
 
 - `XPRA_CHANNEL=beta` builds against the xpra beta repo (amd64 only)
 - `KOLMAFIA_UI_SCALE=2` renders KoLmafia at 2x; pair with `--desktop-scaling=0.5` on a HiDPI native client
+
+## Native client behind Authelia
+
+The native client can't follow Authelia's login redirect. `contrib/xpra-attach-authelia` logs in via Authelia's API and passes the session cookie to `xpra attach`:
+
+```sh
+contrib/xpra-attach-authelia wss://kol.example.com/xpra/
+```
+
+It finds the Authelia portal from the redirect it gets for that URL (set `AUTHELIA_URL` to override), asks for your login in a dialog, and with "Remember me" keeps it in the macOS keychain or Secret Service. Saved logins that stop working are forgotten and you're asked again. On macOS set `XPRA=/Applications/Xpra.app/Contents/MacOS/Xpra` if `xpra` isn't on your `PATH`. Needs `curl` and `jq`.

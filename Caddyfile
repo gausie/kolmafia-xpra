@@ -1,0 +1,25 @@
+{
+	admin off
+	auto_https off
+}
+
+# One port for everything: the relay serves root-absolute paths so it gets /, and the xpra
+# HTML5 client derives its websocket path from the page URL so it works under /xpra/.
+:8080 {
+	redir /xpra /xpra/
+	handle_path /xpra/* {
+		reverse_proxy 127.0.0.1:14500
+	}
+	handle {
+		reverse_proxy 127.0.0.1:60080
+	}
+
+	# The relay only listens once KoLmafia is logged in, so send people to xpra to do that.
+	handle_errors {
+		@relay_down {
+			expression {err.status_code} == 502
+			not path /xpra /xpra/*
+		}
+		redir @relay_down /xpra/
+	}
+}

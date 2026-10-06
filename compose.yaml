@@ -13,7 +13,7 @@ services:
       JAVA_OPTS: ${JAVA_OPTS:-}
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${XPRA_PORT:-14500}:14500"
-      - "${BIND_ADDRESS:-127.0.0.1}:${RELAY_PORT:-60080}:60080"
+      - "${BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-8080}:8080"
     volumes:
       - kolmafia:/home/kolmafia/.kolmafia
       - ${KOLMAFIA_SETTINGS_DIR:-./settings}:/home/kolmafia/.kolmafia/settings
