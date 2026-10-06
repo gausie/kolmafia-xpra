@@ -16,6 +16,18 @@ http_url=$(printf '%s' "$url" | sed 's|^ws://|http://|; s|^wss://|https://|')
 service=xpra-attach-authelia
 icon="$(cd "$(dirname "$0")" && pwd)/kolmafia.png"
 
+# Xpra.app's bundled Python has no CA store, so wss:// fails certificate verification without the
+# CA option. On macOS the tray icon is the dock and app switcher icon (--dock-icon is ignored).
+if [ "$(uname)" = Darwin ]; then
+  # xpra sets this as the dock icon at runtime, which skips macOS's own icon shaping, so use a
+  # version already drawn on the standard rounded plate.
+  [ -f "${icon%.png}-macos.png" ] && icon="${icon%.png}-macos.png"
+  set -- --ssl-ca-certs=/etc/ssl/cert.pem --tray-icon="$icon" "$@"
+  if [ -z "${XPRA:-}" ] && ! command -v xpra >/dev/null 2>&1; then
+    XPRA=/Applications/Xpra.app/Contents/MacOS/Xpra
+  fi
+fi
+
 if [ -n "${AUTHELIA_URL:-}" ]; then
   auth=${AUTHELIA_URL%/}
 else

@@ -33,4 +33,4 @@ The native client can't follow Authelia's login redirect. `contrib/xpra-attach-a
 contrib/xpra-attach-authelia wss://kol.example.com/xpra/
 ```
 
-It finds the Authelia portal from the redirect it gets for that URL (set `AUTHELIA_URL` to override), asks for your login in a dialog, and with "Remember me" keeps it in the macOS keychain or Secret Service. Saved logins that stop working are forgotten and you're asked again. On macOS set `XPRA=/Applications/Xpra.app/Contents/MacOS/Xpra` if `xpra` isn't on your `PATH`. Needs `curl` and `jq`.
+It finds the Authelia portal from the redirect it gets for that URL (set `AUTHELIA_URL` to override), asks for your login in a dialog, and with "Remember me" keeps it in the macOS keychain or Secret Service. Saved logins that stop working are forgotten and you're asked again. On macOS it uses `/Applications/Xpra.app` when `xpra` isn't on your `PATH`. Needs `curl` and `jq`.
