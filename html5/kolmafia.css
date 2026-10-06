@@ -1,0 +1,18 @@
+#kolmafia-version {
+  position: fixed;
+  right: 8px;
+  bottom: 8px;
+  z-index: 100000;
+  padding: 4px 10px;
+  font: 12px sans-serif;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+#kolmafia-version:hover {
+  opacity: 1;
+}

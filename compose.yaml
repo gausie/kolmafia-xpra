@@ -1,0 +1,23 @@
+services:
+  kolmafia:
+    image: ghcr.io/gausie/kolmafia-xpra:latest
+    build:
+      context: .
+      args:
+        XPRA_CHANNEL: ${XPRA_CHANNEL:-stable}
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      KOLMAFIA_UI_SCALE: ${KOLMAFIA_UI_SCALE:-1}
+      JAVA_OPTS: ${JAVA_OPTS:-}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${XPRA_PORT:-14500}:14500"
+      - "${BIND_ADDRESS:-127.0.0.1}:${RELAY_PORT:-60080}:60080"
+    volumes:
+      - kolmafia:/home/kolmafia/.kolmafia
+      - ${KOLMAFIA_SETTINGS_DIR:-./settings}:/home/kolmafia/.kolmafia/settings
+    shm_size: 256m
+
+volumes:
+  kolmafia:

@@ -1,0 +1,12 @@
+<!DOCTYPE Menu PUBLIC "-//freedesktop//DTD Menu 1.0//EN"
+  "http://www.freedesktop.org/standards/menu-spec/1.0/menu.dtd">
+<Menu>
+  <Name>Applications</Name>
+  <DefaultAppDirs/>
+  <Menu>
+    <Name>KoLmafia</Name>
+    <Include>
+      <Filename>kolmafia-version.desktop</Filename>
+    </Include>
+  </Menu>
+</Menu>

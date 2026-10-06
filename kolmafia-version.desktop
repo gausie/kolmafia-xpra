@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=KoLmafia Version
+Comment=Update or roll back KoLmafia
+Exec=/usr/local/bin/kolmafia-version pick
+Categories=Utility;

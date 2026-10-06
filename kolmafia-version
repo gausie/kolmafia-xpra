@@ -1,0 +1,146 @@
+#!/bin/sh
+set -u
+
+repo=https://github.com/kolmafia/kolmafia
+api=https://api.github.com/repos/kolmafia/kolmafia
+jars="$HOME/.kolmafia/jars"
+state="$jars/version"
+running="$XDG_RUNTIME_DIR/kolmafia.running"
+pidfile="$XDG_RUNTIME_DIR/kolmafia.pid"
+dismissed="$XDG_RUNTIME_DIR/kolmafia.dismissed"
+
+mkdir -p "$jars"
+
+latest_release() {
+  curl -fsSI "$repo/releases/latest" | tr -d '\r' | sed -n 's|^location: .*/tag/r\([0-9]*\)$|\1|ip'
+}
+
+selected() {
+  cat "$state" 2>/dev/null || echo latest
+}
+
+cached() {
+  ls "$jars" | sed -n 's/^KoLmafia-\([0-9]*\)\.jar$/\1/p' | sort -n
+}
+
+fetch() {
+  jar="$jars/KoLmafia-$1.jar"
+  [ -f "$jar" ] && return 0
+  echo "Downloading KoLmafia r$1"
+  curl -fsSL -o "$jar.part" "$repo/releases/download/r$1/KoLmafia-$1.jar" || {
+    rm -f "$jar.part"
+    return 1
+  }
+  mv "$jar.part" "$jar"
+}
+
+restart() {
+  [ -f "$pidfile" ] && kill "$(cat "$pidfile")" 2>/dev/null
+}
+
+set_version() {
+  echo "$1" > "$state"
+  restart
+}
+
+pick() {
+  current=$(cat "$running" 2>/dev/null)
+  latest=$(latest_release)
+  releases=$(curl -fsSL "$api/releases?per_page=50" \
+    | jq -r '.[] | select(.assets | any(.name | endswith(".jar"))) | "\(.tag_name | ltrimstr("r"))\t\(.published_at[0:10])"')
+
+  seen=""
+  set -- latest "" "Always run the newest release${latest:+ (r$latest)}"
+  for rev in $(printf '%s\n' "$releases" | cut -f1) $(cached); do
+    case " $seen " in *" $rev "*) continue ;; esac
+    seen="$seen $rev"
+    date=$(printf '%s\n' "$releases" | awk -F'\t' -v r="$rev" '$1 == r { print $2 }')
+    notes=""
+    [ "$rev" = "$current" ] && notes="running"
+    [ -f "$jars/KoLmafia-$rev.jar" ] && notes="${notes:+$notes, }downloaded"
+    set -- "$@" "$rev" "$date" "$notes"
+  done
+  set -- "$@" other "" "Enter a revision..."
+
+  choice=$(zenity --list --title="KoLmafia Version" --width=480 --height=560 \
+    --text="Running r${current:-?}. Currently set to: $(selected)" \
+    --column=Revision --column=Released --column="" "$@") || exit 0
+
+  if [ "$choice" = other ]; then
+    choice=$(zenity --entry --title="KoLmafia Version" --text="Revision number:") || exit 0
+    choice=$(echo "$choice" | sed 's/^r//')
+  fi
+  [ -n "$choice" ] || exit 0
+
+  zenity --question --no-wrap --title="KoLmafia Version" \
+    --text="Restart KoLmafia now to switch to $choice?\n\nAnything it is in the middle of will be interrupted." || exit 0
+
+  set_version "$choice"
+}
+
+offer_update() {
+  current=$1
+  latest=$2
+  echo "$latest" > "$dismissed"
+  echo "Running KoLmafia r$current but r$latest is available"
+  if [ "$(selected)" = latest ]; then
+    zenity --question --no-wrap --title="KoLmafia Update" \
+      --ok-label="Restart now" --cancel-label="Later" \
+      --text="KoLmafia r$latest has been released. You are running r$current.\n\nRestart now to update? Anything KoLmafia is in the middle of will be interrupted." \
+      && restart
+  else
+    zenity --question --no-wrap --title="KoLmafia Update" \
+      --ok-label="Update to r$latest" --cancel-label="Stay on r$current" \
+      --text="KoLmafia r$latest is available. You are pinned to r$current.\n\nUpdating restarts KoLmafia and interrupts anything it is in the middle of." \
+      && set_version latest
+  fi
+}
+
+watch() {
+  while sleep "${KOLMAFIA_UPDATE_INTERVAL:-900}"; do
+    latest=$(latest_release)
+    current=$(cat "$running" 2>/dev/null)
+    [ -n "$latest" ] && [ -n "$current" ] && [ "$current" -lt "$latest" ] || continue
+    [ "$(cat "$dismissed" 2>/dev/null)" = "$latest" ] && continue
+    offer_update "$current" "$latest"
+  done
+}
+
+launch() {
+  watch &
+  while true; do
+    sel=$(selected)
+    latest=$(latest_release)
+    want=$sel
+    [ "$want" = latest ] && want=$latest
+    [ -n "$want" ] || want=$(cached | tail -1)
+    if [ -z "$want" ]; then
+      zenity --error --no-wrap --title=KoLmafia \
+        --text="Could not reach GitHub to find the latest KoLmafia release, and none is downloaded."
+      sleep 30
+      continue
+    fi
+    if ! fetch "$want"; then
+      zenity --error --no-wrap --title=KoLmafia \
+        --text="Could not download KoLmafia r$want. Going back to the newest release."
+      echo latest > "$state"
+      sleep 5
+      continue
+    fi
+
+    echo "Starting KoLmafia r$want"
+    echo "$want" > "$running"
+    if [ -n "$latest" ] && [ "$want" -lt "$latest" ] && [ "$(cat "$dismissed" 2>/dev/null)" != "$latest" ]; then
+      offer_update "$want" "$latest" &
+    fi
+    java -Dsun.java2d.uiScale="${KOLMAFIA_UI_SCALE:-1}" ${JAVA_OPTS:-} -jar "$jars/KoLmafia-$want.jar" &
+    echo $! > "$pidfile"
+    wait $!
+  done
+}
+
+case "${1:-pick}" in
+  launch) launch ;;
+  pick) pick ;;
+  *) echo "usage: kolmafia-version [pick|launch]" >&2; exit 2 ;;
+esac
