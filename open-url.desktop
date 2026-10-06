@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Open in your browser
+Exec=/usr/local/bin/open-url %u
+NoDisplay=true
+MimeType=x-scheme-handler/http;x-scheme-handler/https;

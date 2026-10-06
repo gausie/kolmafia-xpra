@@ -1,0 +1,14 @@
+#!/bin/sh
+# Java hands us the relay as 127.0.0.1:<port>, which means nothing to the user's browser. Caddy
+# serves the relay at the root of whatever origin they reached xpra on, and the HTML5 client
+# resolves a relative URL against that page, so dropping the origin is enough there. The native
+# client has nothing to resolve against, hence KOLMAFIA_PUBLIC_URL. Other URLs (wiki links etc)
+# go through untouched.
+url=$1
+case $url in
+  http://127.0.0.1:* | http://localhost:*)
+    path=$(printf '%s' "$url" | sed -E 's#^http://[^/]*##')
+    url="${KOLMAFIA_PUBLIC_URL%/}${path:-/}"
+    ;;
+esac
+exec xpra control "$DISPLAY" open-url "$url"
