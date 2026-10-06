@@ -21,7 +21,7 @@ RUN apt-get update \
       xpra xpra-x11 xpra-html5 xserver-xorg-core xserver-xorg-video-dummy xauth python3-xdg \
       openjdk-21-jre zenity jq caddy \
       libgtk-3-0t64 \
-      fonts-dejavu fonts-liberation fontconfig \
+      fonts-inter fonts-dejavu fonts-liberation fontconfig \
  && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --uid 1000 kolmafia \
@@ -33,6 +33,7 @@ COPY --chmod=755 entrypoint.sh kolmafia-version open-url /usr/local/bin/
 COPY kolmafia-version.desktop open-url.desktop /usr/share/applications/
 COPY applications.menu /etc/xdg/menus/
 COPY mimeapps.list /etc/xdg/
+COPY fonts.conf /etc/fonts/local.conf
 COPY --from=gio-browse /src/libgiobrowse.so /usr/local/lib/gio/modules/
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY html5/default-settings.txt /etc/xpra/html5-client/

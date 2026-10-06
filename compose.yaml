@@ -5,6 +5,7 @@ services:
       context: .
       args:
         XPRA_CHANNEL: ${XPRA_CHANNEL:-stable}
+    hostname: kolmafia
     restart: unless-stopped
     environment:
       PUID: ${PUID:-1000}
